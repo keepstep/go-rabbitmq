@@ -68,14 +68,18 @@ func (r *Rmq) Connect() (err error) {
 		return nil
 	} else {
 		//--------close------
-		for _, channel := range r.channels {
-			channel.Close("")
-		}
-		clear(r.channels)
-		if r.ch != nil {
-			r.ch = nil
-			r.ch.Close("")
-		}
+		func() {
+			r.mtxCh.Lock()
+			defer r.mtxCh.Unlock()
+			for _, channel := range r.channels {
+				channel.Close("")
+			}
+			clear(r.channels)
+			if r.ch != nil {
+				r.ch = nil
+				r.ch.Close("")
+			}
+		}()
 		//------------------
 		r.ntfClose = make(chan *amqp.Error)
 		r.done = make(chan error)
@@ -211,20 +215,20 @@ func (r *Rmq) PublishDlx(ctx context.Context, path, correlationId, replyTo, body
 	return r.ch.PublishDlx(ctx, path, correlationId, replyTo, body, delay)
 }
 
-func (r *Rmq) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
+func (r *Rmq) Consume(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
 	err = r.Check()
 	if err != nil {
 		return
 	}
-	return r.ch.GenConsumer(path, queue, tag)
+	return r.ch.Consume(path, queue, tag)
 }
 
-func (r *Rmq) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
+func (r *Rmq) ConsumeDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
 	err = r.Check()
 	if err != nil {
 		return
 	}
-	return r.ch.GenConsumerDlx(path, queue, tag)
+	return r.ch.ConsumeDlx(path, queue, tag)
 }
 
 func (r *Rmq) Receive(ctx context.Context, msgs <-chan amqp.Delivery, callback func(msg *amqp.Delivery, err error) (ackOrReject bool, stop bool)) error {

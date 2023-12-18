@@ -274,7 +274,7 @@ func (r *RmqCh) __prepareForConsume(exchangeKind, exchange, queue, route string)
 	return
 }
 
-func (r *RmqCh) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
+func (r *RmqCh) Consume(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -285,14 +285,14 @@ func (r *RmqCh) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery,
 	if path != "" {
 		exchangeKind, exchange, _, route, err = __parsePath(path)
 		if err != nil {
-			amqp.Logger.Printf("rmq error genconsumer-parsepath:%s", err)
+			amqp.Logger.Printf("rmq error consume-parsepath:%s", err)
 			return
 		}
 	}
 
 	q, err := r.__prepareForConsume(exchangeKind, exchange, queue, route)
 	if err != nil {
-		amqp.Logger.Printf("rmq error genconsumer-prepare:%s", err)
+		amqp.Logger.Printf("rmq error consume-prepare:%s", err)
 		return
 	}
 	msgs, err = r.ch.Consume(
@@ -306,12 +306,12 @@ func (r *RmqCh) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery,
 	)
 	done = r.done
 	if err != nil {
-		amqp.Logger.Printf("rmq error genconsumer:%s", err)
+		amqp.Logger.Printf("rmq error consume:%s", err)
 	}
 	return
 }
 
-func (r *RmqCh) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
+func (r *RmqCh) ConsumeDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -322,18 +322,18 @@ func (r *RmqCh) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delive
 	if path != "" {
 		exchangeKind, exchange, queueDlx, err = __parsePathForDlx(path)
 		if err != nil {
-			amqp.Logger.Printf("rmq error genconsumer_dlx-parsepath:%s", err)
+			amqp.Logger.Printf("rmq error consume_dlx-parsepath:%s", err)
 			return
 		}
 	}
 	if queue == queueDlx {
-		amqp.Logger.Printf("rmq error genconsumer_dlx-parsepath: queue == queueDlx")
+		amqp.Logger.Printf("rmq error consume_dlx-parsepath: queue == queueDlx")
 		err = errors.New("queue == queueDlx from path")
 		return
 	}
 	q, err := r.__prepareForConsume(exchangeKind, exchange, queue, queueDlx)
 	if err != nil {
-		amqp.Logger.Printf("rmq error genconsumer_dlx-prepare:%s", err)
+		amqp.Logger.Printf("rmq error consume_dlx-prepare:%s", err)
 		return
 	}
 	msgs, err = r.ch.Consume(
@@ -347,7 +347,7 @@ func (r *RmqCh) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delive
 	)
 	done = r.done
 	if err != nil {
-		amqp.Logger.Printf("rmq error genconsumer_dlx:%s", err)
+		amqp.Logger.Printf("rmq error consume_dlx:%s", err)
 	}
 	return
 }

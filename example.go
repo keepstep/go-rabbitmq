@@ -39,9 +39,9 @@ func test() {
 	replyTo := "pig"
 	timeDelay := time.Duration(1)
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
-	msgs, _, err := r.GenConsumer(path, queue, "")
+	msgs, _, err := r.Consume(path, queue, "")
 	if err != nil {
-		Log("GenConsumer err %s", err)
+		Log("Consume err %s", err)
 		return
 	}
 
@@ -106,9 +106,9 @@ func testDlx() {
 	replyTo := "pig"
 	timeDelay := time.Millisecond * 100
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
-	msgs, _, err := r.GenConsumerDlx(path, queue, "")
+	msgs, _, err := r.ConsumeDlx(path, queue, "")
 	if err != nil {
-		Log("GenConsumer err %s", err)
+		Log("Consume err %s", err)
 		return
 	}
 
@@ -182,9 +182,9 @@ func testDlxMultiChannel() {
 		Log("Channel err %s", err)
 		return
 	}
-	msgs, _, err := rch.GenConsumerDlx(path, queue, "")
+	msgs, _, err := rch.ConsumeDlx(path, queue, "")
 	if err != nil {
-		Log("GenConsumer err %s", err)
+		Log("Consume err %s", err)
 		return
 	}
 
@@ -277,9 +277,9 @@ func testReconnect() {
 			<-time.After(time.Second * 2)
 			continue
 		}
-		msgs, _, err := rch.GenConsumer(path, queue, "")
+		msgs, _, err := rch.Consume(path, queue, "")
 		if err != nil {
-			Log("receive GenConsumer err %s", err)
+			Log("receive Consume err %s", err)
 			<-time.After(time.Second * 2)
 			continue
 		}
@@ -353,9 +353,9 @@ func testRpc() {
 			<-time.After(time.Second * 2)
 			continue
 		}
-		msgs, _, err := rch.GenConsumer(queue, queue, "")
+		msgs, _, err := rch.Consume(queue, queue, "")
 		if err != nil {
-			Log("rpc GenConsumer err %s", err)
+			Log("rpc Consume err %s", err)
 			<-time.After(time.Second * 2)
 			continue
 		}
@@ -437,9 +437,9 @@ func testStream() {
 			<-time.After(time.Second * 2)
 			continue
 		}
-		msgs, _, err := rch.GenConsumer(queue, queue, "")
+		msgs, _, err := rch.Consume(queue, queue, "")
 		if err != nil {
-			Log("stream GenConsumer err %s", err)
+			Log("stream Consume err %s", err)
 			<-time.After(time.Second * 2)
 			continue
 		}
