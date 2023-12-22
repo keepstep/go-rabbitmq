@@ -392,7 +392,11 @@ func testStream() {
 		"amqp://keep:keep@localhost:8672/aaaa",
 		"amqp://keep:keep@localhost:6672/aaaa",
 	}
-	r, err := rmq.NewRmq(urls, nil)
+	r, err := rmq.NewRmq(urls, nil,
+		rmq.OptionAutoDelete(true),
+		rmq.OptionContentType("json"),
+		rmq.OptionRpcPurgeQueue(true, true),
+	)
 	if err != nil {
 		Log("NewRmq err %s", err)
 		return

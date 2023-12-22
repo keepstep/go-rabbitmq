@@ -41,6 +41,13 @@ func (r *RmqCh) Stream(ctx context.Context, queue, replyTo string, streamFunc fu
 		return
 	}
 
+	if r.option.StreamPurgePubQueue {
+		r.ch.QueuePurge(queue, false)
+	}
+	if r.option.StreamPurgeReplyQueue {
+		r.ch.QueuePurge(replyTo, false)
+	}
+
 	i := 0
 	//must cancel stream for use only one consume
 	tag := fmt.Sprintf("stream_%p", r.ch)

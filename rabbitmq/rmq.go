@@ -22,6 +22,7 @@ type Rmq struct {
 	conn *amqp.Connection
 	// ch   *amqp.Channel
 	ch        *RmqCh           ////default channel
+	option    RmqOption        ////default o
 	ntfClose  chan *amqp.Error ////生产者关闭，自己不关闭
 	done      chan error       ////自己是生产者，自己关闭
 	mtx       sync.Mutex
@@ -37,7 +38,7 @@ func (*RmqLogger) Printf(format string, v ...interface{}) {
 	fmt.Printf(format+"\n", v...)
 }
 
-func NewRmq(urls []string, logger amqp.Logging) (r *Rmq, err error) {
+func NewRmq(urls []string, logger amqp.Logging, args ...Option) (r *Rmq, err error) {
 	r = new(Rmq)
 	err = r.Init(urls)
 	if err != nil {
@@ -48,6 +49,7 @@ func NewRmq(urls []string, logger amqp.Logging) (r *Rmq, err error) {
 	} else {
 		amqp.SetLogger(new(RmqLogger))
 	}
+	r.option = NewOption(args...)
 	return
 }
 
@@ -59,6 +61,13 @@ func (r *Rmq) Init(urls []string) error {
 	r.urls = urls
 	r.channels = map[string]*RmqCh{}
 	return nil
+}
+
+func (r *Rmq) ApplyOption(args ...Option) {
+	ApplyOption(&r.option, args...)
+	if r.ch != nil {
+		r.ch.ApplyOption(args...)
+	}
 }
 
 func (r *Rmq) Connect() (err error) {
@@ -107,7 +116,7 @@ func (r *Rmq) Connect() (err error) {
 	return
 }
 
-func (r *Rmq) Channel(name string) (rch *RmqCh, err error) {
+func (r *Rmq) Channel(name string, args ...Option) (rch *RmqCh, err error) {
 	err = r.Connect()
 	if err != nil {
 		return
@@ -127,7 +136,11 @@ func (r *Rmq) Channel(name string) (rch *RmqCh, err error) {
 	}
 	//-------------------
 	rch = new(RmqCh)
-	rch.Init(ch)
+	opt := r.option
+	if len(args) > 0 {
+		opt = NewOption(args...)
+	}
+	rch.Init(ch, opt)
 	r.channels[name] = rch
 	amqp.Logger.Printf("rmq channel succ %s", name)
 	return
@@ -194,7 +207,7 @@ func (r *Rmq) Check() (err error) {
 			return err
 		}
 		r.ch = new(RmqCh)
-		r.ch.Init(ch)
+		r.ch.Init(ch, r.option)
 	}
 	return
 }

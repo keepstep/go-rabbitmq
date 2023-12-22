@@ -17,15 +17,25 @@ type RmqCh struct {
 	ntfClose  chan *amqp.Error ////生产者关闭，自己不关闭
 	done      chan error       ////自己是生产者，自己关闭
 	lastError string
+	option    RmqOption
 }
 
-func (c *RmqCh) Init(ch *amqp.Channel) {
+func (c *RmqCh) Init(ch *amqp.Channel, opt RmqOption) {
 	c.ch = ch
 	c.ntfClose = make(chan *amqp.Error)
 	c.done = make(chan error)
-	c.ch.Qos(1, 0, false)
+	c.ch.Qos(
+		c.option.QosPrefetchCount,
+		c.option.QosPrefetchSize,
+		c.option.QosGlobal,
+	)
 	c.ch.NotifyClose(c.ntfClose)
+	c.option = opt
 	go c.checkConnection()
+}
+
+func (c *RmqCh) ApplyOption(args ...Option) {
+	ApplyOption(&c.option, args...)
 }
 
 func (c *RmqCh) Check() (err error) {
@@ -130,14 +140,26 @@ func (r *RmqCh) __prepareForPublish(exchangeKind, exchange, queue string) (err e
 		return
 	}
 	if exchangeKind != "" {
-		err = r.ch.ExchangeDeclare(exchange, exchangeKind, true, false, false, false, nil)
+		err = r.ch.ExchangeDeclare(exchange, exchangeKind,
+			r.option.Durable,
+			r.option.AutoDelete,
+			r.option.ExchangeInternal,
+			r.option.NoWait,
+			r.option.ExchangeArg,
+		)
 		if err != nil {
 			return
 		}
 	}
 	// maybe not declare by publisher to avoid conflict with consume in other connection while exclusive = true
 	if queue != "" {
-		_, err = r.ch.QueueDeclare(queue, true, false, false, false, nil)
+		_, err = r.ch.QueueDeclare(queue,
+			r.option.Durable,
+			r.option.AutoDelete,
+			r.option.Exclusive,
+			r.option.NoWait,
+			r.option.QueueArg,
+		)
 	}
 	return
 }
@@ -158,13 +180,18 @@ func (r *RmqCh) Publish(ctx context.Context, path, correlationId, replyTo, body 
 		return
 	}
 
-	err = r.ch.PublishWithContext(ctx, exchange, key, false, false, amqp.Publishing{
-		DeliveryMode:  amqp.Persistent,
-		ContentType:   "text/plain",
-		ReplyTo:       replyTo,
-		CorrelationId: correlationId,
-		Body:          []byte(body),
-	})
+	err = r.ch.PublishWithContext(ctx, exchange, key,
+		r.option.Mandatory,
+		r.option.Immediate,
+		amqp.Publishing{
+			DeliveryMode:    r.option.DeliveryMode,
+			ContentType:     r.option.ContentType,
+			ContentEncoding: r.option.ContentEncoding,
+			Type:            r.option.MessageType,
+			ReplyTo:         replyTo,
+			CorrelationId:   correlationId,
+			Body:            []byte(body),
+		})
 	if err != nil {
 		amqp.Logger.Printf("rmq error publish:%s", err)
 	} else {
@@ -192,18 +219,29 @@ func (r *RmqCh) __prepareForPublishDlx(exchangeKind, exchange, queueDlx string) 
 	if err != nil {
 		return
 	}
-	err = r.ch.ExchangeDeclare(exchange, exchangeKind, true, false, false, false, nil)
+	err = r.ch.ExchangeDeclare(exchange, exchangeKind,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.ExchangeInternal,
+		r.option.NoWait,
+		r.option.ExchangeArg,
+	)
 	if err != nil {
 		return
 	}
-	q, err = r.ch.QueueDeclare(queueDlx, true, false, false, false, amqp.Table{
-		"x-dead-letter-exchange": exchange,
-		// "x-mesage-ttl":86400000, //队列中消息的过期时间，单位为毫秒, 和消息pub时的过期时间取最小值起作用
-		// "x-dead-letter-routing-key":queue, //死信交换机根据当前重新指定的routin key将消息重新路由到死信队列
-		// "x-expires":86400000, //表示超过该设定的时间，队列将被自动删除,
-		// "x-max-length",表示队列中能存储的最大消息数，超过该数值后，消息变为死信
+	q, err = r.ch.QueueDeclare(queueDlx,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		amqp.Table{
+			"x-dead-letter-exchange": exchange,
+			// "x-mesage-ttl":86400000, //队列中消息的过期时间，单位为毫秒, 和消息pub时的过期时间取最小值起作用
+			// "x-dead-letter-routing-key":queue, //死信交换机根据当前重新指定的routin key将消息重新路由到死信队列
+			// "x-expires":86400000, //表示超过该设定的时间，队列将被自动删除,
+			// "x-max-length",表示队列中能存储的最大消息数，超过该数值后，消息变为死信
 
-	})
+		})
 	return
 }
 
@@ -226,15 +264,20 @@ func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, bo
 	duration := time.Duration(q.Messages+1) * delay
 	expiration := fmt.Sprintf("%d", int(duration.Milliseconds()))
 
-	err = r.ch.PublishWithContext(ctx, "", queueDlx, false, false, amqp.Publishing{
-		DeliveryMode:  amqp.Persistent,
-		ContentType:   "text/plain",
-		ReplyTo:       replyTo,
-		CorrelationId: correlationId,
-		Body:          []byte(body),
-		Timestamp:     time.Now(),
-		Expiration:    expiration,
-	})
+	err = r.ch.PublishWithContext(ctx, "", queueDlx,
+		r.option.Mandatory,
+		r.option.Immediate,
+		amqp.Publishing{
+			DeliveryMode:    r.option.DeliveryMode,
+			ContentType:     r.option.ContentType,
+			ContentEncoding: r.option.ContentEncoding,
+			Type:            r.option.MessageType,
+			ReplyTo:         replyTo,
+			CorrelationId:   correlationId,
+			Body:            []byte(body),
+			Timestamp:       time.Now(),
+			Expiration:      expiration,
+		})
 	if err != nil {
 		amqp.Logger.Printf("rmq error publish_dlx:%s", err)
 	} else {
@@ -248,7 +291,13 @@ func (r *RmqCh) __prepareForConsume(exchangeKind, exchange, queue, route string)
 	if err != nil {
 		return
 	}
-	q, err = r.ch.QueueDeclare(queue, true, false, false, false, nil)
+	q, err = r.ch.QueueDeclare(queue,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	if err != nil {
 		amqp.Logger.Printf("rmq error prepare_for_consume queue_declare:%s", err)
 		return
@@ -257,14 +306,23 @@ func (r *RmqCh) __prepareForConsume(exchangeKind, exchange, queue, route string)
 	}
 
 	if exchangeKind != "" {
-		err = r.ch.ExchangeDeclare(exchange, exchangeKind, true, false, false, false, nil)
+		err = r.ch.ExchangeDeclare(exchange, exchangeKind,
+			r.option.Durable,
+			r.option.AutoDelete,
+			r.option.ExchangeInternal,
+			r.option.NoWait,
+			r.option.ExchangeArg,
+		)
 		if err != nil {
 			amqp.Logger.Printf("rmq error prepare_for_consume exchange_declare:%s", err)
 			return
 		} else {
 			// amqp.Logger.Printf("rmq prepare_for_consume exchange_declare succ :%s %s", exchangeKind, exchange)
 		}
-		err = r.ch.QueueBind(q.Name, route, exchange, false, nil)
+		err = r.ch.QueueBind(q.Name, route, exchange,
+			r.option.NoWait,
+			nil,
+		)
 		if err != nil {
 			amqp.Logger.Printf("rmq error prepare_for_consume queue_bind:%s", err)
 			return
@@ -297,13 +355,13 @@ func (r *RmqCh) Consume(path, queue, tag string) (msgs <-chan amqp.Delivery, don
 		return
 	}
 	msgs, err = r.ch.Consume(
-		q.Name, // queue
-		tag,    // consumer
-		false,  // auto ack
-		false,  // exclusive
-		false,  // no local
-		false,  // no wait
-		nil,    // args
+		q.Name,                    // queue
+		tag,                       // consumer
+		r.option.ConsumeAutoAck,   // auto ack
+		r.option.ConsumeExclusive, // exclusive
+		false,                     // no local
+		r.option.ConsumeNoWait,    // no wait
+		r.option.ConsumeArg,       // args
 	)
 	done = r.done
 	if err != nil {
@@ -338,13 +396,13 @@ func (r *RmqCh) ConsumeDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, 
 		return
 	}
 	msgs, err = r.ch.Consume(
-		q.Name, // queue
-		tag,    // consumer
-		false,  // auto ack
-		false,  // exclusive
-		false,  // no local
-		false,  // no wait
-		nil,    // args
+		q.Name,                    // queue
+		tag,                       // consumer
+		r.option.ConsumeAutoAck,   // auto ack
+		r.option.ConsumeExclusive, // exclusive
+		false,                     // no local
+		r.option.ConsumeNoWait,    // no wait
+		r.option.ConsumeArg,       // args
 	)
 	done = r.done
 	if err != nil {

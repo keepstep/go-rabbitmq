@@ -37,6 +37,13 @@ func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body str
 		return
 	}
 
+	if r.option.RpcPurgePubQueue {
+		r.ch.QueuePurge(queue, false)
+	}
+	if r.option.RpcPurgeReplyQueue {
+		r.ch.QueuePurge(replyTo, false)
+	}
+
 	err = r.ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
 		DeliveryMode:  amqp.Persistent,
 		ContentType:   "text/plain",
