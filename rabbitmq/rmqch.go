@@ -135,6 +135,7 @@ func (r *RmqCh) __prepareForPublish(exchangeKind, exchange, queue string) (err e
 			return
 		}
 	}
+	// maybe not declare by publisher to avoid conflict with consume in other connection while exclusive = true
 	if queue != "" {
 		_, err = r.ch.QueueDeclare(queue, true, false, false, false, nil)
 	}
