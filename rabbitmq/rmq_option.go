@@ -1,6 +1,9 @@
 package rabbitmq
 
 import (
+	"time"
+
+	clone "github.com/huandu/go-clone/generic"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -13,6 +16,8 @@ type RmqOption struct {
 	NoWait     bool
 	Exclusive  bool
 	QueueArg   amqp.Table
+	MessageTTL int //merge into QueueArg, can be reset by OptionQueueArg. eg:"x-mesage-ttl":86400000
+	Expires    int //merge into QueueArg, can be reset by OptionQueueArg. eg:"x-expires":86400000
 
 	//exchange
 	ExchangeInternal bool
@@ -83,6 +88,10 @@ func ApplyOption(opt *RmqOption, args ...Option) {
 	}
 }
 
+func CloneOption(opt *RmqOption) *RmqOption {
+	return clone.Clone(opt)
+}
+
 func OptionDurable(durable bool) Option {
 	return func(opt *RmqOption) {
 		opt.Durable = durable
@@ -110,6 +119,26 @@ func OptionExclusive(exclusive bool) Option {
 func OptionQueueArg(arg amqp.Table) Option {
 	return func(opt *RmqOption) {
 		opt.QueueArg = arg
+	}
+}
+
+func OptionMessageTTL(t time.Duration) Option {
+	return func(opt *RmqOption) {
+		opt.MessageTTL = int(t.Milliseconds())
+		if opt.QueueArg == nil {
+			opt.QueueArg = amqp.Table{}
+		}
+		opt.QueueArg["x-mesage-ttl"] = opt.MessageTTL
+	}
+}
+
+func OptionExpires(t time.Duration) Option {
+	return func(opt *RmqOption) {
+		opt.Expires = int(t.Milliseconds())
+		if opt.QueueArg == nil {
+			opt.QueueArg = amqp.Table{}
+		}
+		opt.QueueArg["x-expires"] = opt.Expires
 	}
 }
 

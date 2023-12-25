@@ -124,8 +124,8 @@ func (r *Rmq) Channel(name string, args ...Option) (rch *RmqCh, err error) {
 	r.mtxCh.Lock()
 	defer r.mtxCh.Unlock()
 	channel := r.channels[name]
-	// if channel != nil && !channel.IsClosed() {
-	if channel != nil {
+	//channel closed, need to check channel.IsClosed
+	if channel != nil && !channel.IsClosed() {
 		return channel, nil
 	}
 	//-------------------
@@ -136,11 +136,14 @@ func (r *Rmq) Channel(name string, args ...Option) (rch *RmqCh, err error) {
 	}
 	//-------------------
 	rch = new(RmqCh)
-	opt := r.option
 	if len(args) > 0 {
-		opt = NewOption(args...)
+		opt := NewOption(args...)
+		rch.Init(ch, opt)
+	} else {
+		opt := *CloneOption(&r.option)
+		rch.Init(ch, opt)
 	}
-	rch.Init(ch, opt)
+
 	r.channels[name] = rch
 	amqp.Logger.Printf("rmq channel succ %s", name)
 	return
@@ -200,7 +203,8 @@ func (r *Rmq) Check() (err error) {
 	}
 	r.mtxCh.Lock()
 	defer r.mtxCh.Unlock()
-	if r.ch == nil {
+	//channel closed, need to check channel.IsClosed
+	if r.ch == nil || r.ch.IsClosed() {
 		ch, err := r.conn.Channel()
 		if err != nil {
 			amqp.Logger.Printf("rmq error check channel")
@@ -306,4 +310,12 @@ func (r *Rmq) ExchangeUnbind(destination, key, source string) (err error) {
 		return
 	}
 	return r.ch.ExchangeUnbind(destination, key, source)
+}
+
+func (r *Rmq) QueueInspect(name string) (q amqp.Queue, err error) {
+	err = r.Check()
+	if err != nil {
+		return
+	}
+	return r.ch.QueueInspect(name)
 }

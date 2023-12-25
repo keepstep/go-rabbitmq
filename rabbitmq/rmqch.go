@@ -31,7 +31,7 @@ func (c *RmqCh) Init(ch *amqp.Channel, opt RmqOption) {
 	)
 	c.ch.NotifyClose(c.ntfClose)
 	c.option = opt
-	go c.checkConnection()
+	go c.checkChannel()
 }
 
 func (c *RmqCh) ApplyOption(args ...Option) {
@@ -48,15 +48,15 @@ func (c *RmqCh) Check() (err error) {
 	return
 }
 
-func (c *RmqCh) checkConnection() {
+func (c *RmqCh) checkChannel() {
 	go func() {
 		select {
 		case err := <-c.ntfClose:
-			amqp.Logger.Printf("rmqch check connection close %s", err)
+			amqp.Logger.Printf("rmqch check channel close %s", err)
 			c.Close(RmqConnClose)
 			break
 		case <-c.done:
-			amqp.Logger.Printf("rmqch check connection done")
+			amqp.Logger.Printf("rmqch check channel done")
 			break
 		}
 	}()
@@ -229,19 +229,25 @@ func (r *RmqCh) __prepareForPublishDlx(exchangeKind, exchange, queueDlx string) 
 	if err != nil {
 		return
 	}
+	//-----copy-------
+	tmp := amqp.Table{}
+	for k, v := range r.option.QueueArg {
+		tmp[k] = v
+	}
+	tmp["x-dead-letter-exchange"] = exchange
+	// "x-dead-letter-exchange:exchange,
+	// "x-mesage-ttl":86400000, //队列中消息的过期时间，单位为毫秒, 和消息pub时的过期时间取最小值起作用
+	// "x-dead-letter-routing-key":queue, //死信交换机根据当前重新指定的routin key将消息重新路由到死信队列
+	// "x-expires":86400000, //表示超过该设定的时间，队列将被自动删除,
+	// "x-max-length",表示队列中能存储的最大消息数，超过该数值后，消息变为死信
+	//---------------
 	q, err = r.ch.QueueDeclare(queueDlx,
 		r.option.Durable,
 		r.option.AutoDelete,
 		r.option.Exclusive,
 		r.option.NoWait,
-		amqp.Table{
-			"x-dead-letter-exchange": exchange,
-			// "x-mesage-ttl":86400000, //队列中消息的过期时间，单位为毫秒, 和消息pub时的过期时间取最小值起作用
-			// "x-dead-letter-routing-key":queue, //死信交换机根据当前重新指定的routin key将消息重新路由到死信队列
-			// "x-expires":86400000, //表示超过该设定的时间，队列将被自动删除,
-			// "x-max-length",表示队列中能存储的最大消息数，超过该数值后，消息变为死信
-
-		})
+		tmp,
+	)
 	return
 }
 

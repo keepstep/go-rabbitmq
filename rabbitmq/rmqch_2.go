@@ -1,5 +1,9 @@
 package rabbitmq
 
+import (
+	amqp "github.com/rabbitmq/amqp091-go"
+)
+
 func (r *RmqCh) QueuePurge(queue string) (count int, err error) {
 	err = r.Check()
 	if err != nil {
@@ -42,5 +46,20 @@ func (r *RmqCh) ExchangeUnbind(destination, key, source string) (err error) {
 		return
 	}
 	err = r.ch.ExchangeUnbind(destination, key, source, false, nil)
+	return
+}
+
+func (r *RmqCh) QueueInspect(name string) (q amqp.Queue, err error) {
+	err = r.Check()
+	if err != nil {
+		return
+	}
+	q, err = r.ch.QueueDeclarePassive(name,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	return
 }

@@ -86,7 +86,10 @@ func testDlx() {
 		"amqp://keep:keep@localhost:8672/aaaa",
 		"amqp://keep:keep@localhost:6672/aaaa",
 	}
-	r, err := rmq.NewRmq(urls, nil)
+	r, err := rmq.NewRmq(urls, nil,
+		rmq.OptionAutoDelete(true),
+		// rmq.OptionExpires(time.Second*10),
+	)
 	if err != nil {
 		Log("NewRmq err %s", err)
 		return
@@ -106,6 +109,9 @@ func testDlx() {
 	replyTo := "pig"
 	timeDelay := time.Millisecond * 100
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
+	r.QueueDelete(queue, false, false)
+	r.QueueDelete(replyTo, false, false)
+	r.ExchangeDelete("ex_dlx_topic", false)
 	msgs, _, err := r.ConsumeDlx(path, queue, "")
 	if err != nil {
 		Log("Consume err %s", err)
@@ -148,6 +154,7 @@ func testDlx() {
 	if err != nil {
 		Log("receive dlx_msg err %s", err)
 	}
+	<-time.After(time.Second * 5)
 	Log("test dlx_msg over")
 }
 
@@ -410,6 +417,13 @@ func testStream() {
 	replyTo := "stream_q_return"
 	count := 100
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
+	// r.QueueDelete(queue, false, false)
+	// r.QueueDelete(replyTo, false, false)
+	q, eeee := r.QueueInspect(queue)
+	Log("stream inspect queue %s : %d %d %s", q.Name, q.Messages, q.Consumers, eeee)
+	q, eeee = r.QueueInspect(replyTo)
+	Log("stream inspect queue %s : %d %d %s", q.Name, q.Messages, q.Consumers, eeee)
+
 	go func() {
 		eee := r.Stream(ctx, queue, replyTo, func(isReq bool, data *rmq.RmqStreamData) (stop bool) {
 			if isReq {
@@ -432,6 +446,17 @@ func testStream() {
 		})
 		if eee != nil {
 			Log("stream err %s", eee)
+		}
+	}()
+	go func() {
+		<-time.After(time.Second * 5)
+		q, eeee := r.QueueInspect(queue)
+		if eeee == nil {
+			Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
+		}
+		q, eeee = r.QueueInspect(replyTo)
+		if eeee == nil {
+			Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
 		}
 	}()
 	for {

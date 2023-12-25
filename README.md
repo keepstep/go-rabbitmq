@@ -85,6 +85,6 @@ func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, bo
 ```
 ## Todo
 ```golang
-1. maybe support input more params of original rabbitmq and keep simple
+1. maybe handler err <-chan notify sequence
 2. maybe auto reconnect
 ```
