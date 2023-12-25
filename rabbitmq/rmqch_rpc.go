@@ -26,12 +26,24 @@ func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body str
 		amqp.Logger.Printf("rpc error correlationId empty")
 		return
 	}
-	_, err = r.ch.QueueDeclare(queue, true, false, false, false, nil)
+	_, err = r.ch.QueueDeclare(queue,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	if err != nil {
 		amqp.Logger.Printf("rpc error queue declare")
 		return
 	}
-	_, err = r.ch.QueueDeclare(replyTo, true, false, false, false, nil)
+	_, err = r.ch.QueueDeclare(replyTo,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	if err != nil {
 		amqp.Logger.Printf("rpc error replyTo declare")
 		return
@@ -44,13 +56,18 @@ func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body str
 		r.ch.QueuePurge(replyTo, false)
 	}
 
-	err = r.ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
-		DeliveryMode:  amqp.Persistent,
-		ContentType:   "text/plain",
-		ReplyTo:       replyTo,
-		CorrelationId: correlationId,
-		Body:          []byte(body),
-	})
+	err = r.ch.PublishWithContext(ctx, "", queue,
+		r.option.Mandatory,
+		r.option.Immediate,
+		amqp.Publishing{
+			DeliveryMode:    r.option.DeliveryMode,
+			ContentType:     r.option.ContentType,
+			ContentEncoding: r.option.ContentEncoding,
+			Type:            r.option.MessageType,
+			ReplyTo:         replyTo,
+			CorrelationId:   correlationId,
+			Body:            []byte(body),
+		})
 	if err != nil {
 		amqp.Logger.Printf("rpc error publish:%s", err)
 	} else {
@@ -61,13 +78,13 @@ func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body str
 	tag := fmt.Sprintf("rpc_%p", r.ch)
 	r.ch.Cancel(tag, false)
 	msgs, err := r.ch.Consume(
-		replyTo, // queue
-		tag,     // consumer
-		false,   // auto ack
-		true,    // exclusive
-		false,   // no local
-		false,   // no wait
-		nil,     // args
+		replyTo,                 // queue
+		tag,                     // consumer
+		r.option.ConsumeAutoAck, // auto ack
+		true,                    // exclusive
+		false,                   // no local
+		r.option.ConsumeNoWait,  // no wait
+		r.option.ConsumeArg,     // args
 	)
 	if err != nil {
 		amqp.Logger.Printf("rpc error consume:%s", err)

@@ -2,7 +2,7 @@
 
 ## Urls and connect
 ```golang 
-1. support multi urls, supposed that these urls belong to one cluster
+1. support multi urls, supposed that these urls belong to same cluster
 2. try next url if previous connecting err in function Connect until the end, not retry looply
 3. commonly you need to recall Connect or other funcs in your code while current connection closed 
 ```
@@ -11,6 +11,13 @@
 ```
 1. consist of exchageType，exchangeName，key(for publish) or route(for consume) and seperated by '/', in order to simply call
 2. path is queue name if not use exchange
+```
+
+## Option
+```golang 
+1. each rmqch hold an exclusive Option
+2. rmqch will hold an Option inherited from rmq.option while call rmq.Channel(name,nil)
+3. you can call ApplyOption to change option of rmq
 ```
 
 ```golang
@@ -42,6 +49,7 @@ func (r *Rmq) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery
 ```golang
 1. do not support exchange and consume with param exclusive: true
 2. identify messages by correlationID and auto ignore the other messages until received the correct msg then return
+3. Option also effect on rpc, so it is better to use a new channel exclusively to call rpc
 ```
 
 ## Stream
@@ -50,6 +58,7 @@ func (r *Rmq) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery
 2. identify messages by correlationID and auto ignore the other messages until received the correct msg then return
 3. param callback has two functions : fill request correlationId,body and receive response body for each rpc
 4. continuously rpc, until callback return true then return
+5. Option also effect on stream, so it is better to use a new channel exclusively to call stream
 ```
 
 ## DLX testing feature

@@ -32,11 +32,23 @@ func (r *RmqCh) Stream(ctx context.Context, queue, replyTo string, streamFunc fu
 		err = errors.New("stream error replyto empty")
 		return
 	}
-	_, err = r.ch.QueueDeclare(queue, true, false, false, false, nil)
+	_, err = r.ch.QueueDeclare(queue,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	if err != nil {
 		return
 	}
-	_, err = r.ch.QueueDeclare(replyTo, true, false, false, false, nil)
+	_, err = r.ch.QueueDeclare(replyTo,
+		r.option.Durable,
+		r.option.AutoDelete,
+		r.option.Exclusive,
+		r.option.NoWait,
+		r.option.QueueArg,
+	)
 	if err != nil {
 		return
 	}
@@ -53,13 +65,13 @@ func (r *RmqCh) Stream(ctx context.Context, queue, replyTo string, streamFunc fu
 	tag := fmt.Sprintf("stream_%p", r.ch)
 	r.ch.Cancel(tag, false)
 	msgs, eee := r.ch.Consume(
-		replyTo, // queue
-		tag,     // consumer
-		false,   // auto ack
-		true,    // exclusive
-		false,   // no local
-		false,   // no wait
-		nil,     // args
+		replyTo,                 // queue
+		tag,                     // consumer
+		r.option.ConsumeAutoAck, // auto ack
+		true,                    // exclusive
+		false,                   // no local
+		r.option.ConsumeNoWait,  // no wait
+		r.option.ConsumeArg,     // args
 	)
 	err = eee
 	if err != nil {
@@ -84,13 +96,18 @@ func (r *RmqCh) Stream(ctx context.Context, queue, replyTo string, streamFunc fu
 			return
 		}
 		correlationId := data.CorrelationId
-		err = r.ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
-			DeliveryMode:  amqp.Persistent,
-			ContentType:   "text/plain",
-			ReplyTo:       replyTo,
-			CorrelationId: data.CorrelationId,
-			Body:          data.ReqBody,
-		})
+		err = r.ch.PublishWithContext(ctx, "", queue,
+			r.option.Mandatory,
+			r.option.Immediate,
+			amqp.Publishing{
+				DeliveryMode:    r.option.DeliveryMode,
+				ContentType:     r.option.ContentType,
+				ContentEncoding: r.option.ContentEncoding,
+				Type:            r.option.MessageType,
+				ReplyTo:         replyTo,
+				CorrelationId:   data.CorrelationId,
+				Body:            data.ReqBody,
+			})
 		if err != nil {
 			amqp.Logger.Printf("stream error publish: %d %s", i, err)
 		} else {

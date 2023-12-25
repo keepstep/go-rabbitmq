@@ -28,7 +28,7 @@ type RmqOption struct {
 
 	//consume
 	ConsumeAutoAck   bool
-	ConsumeExclusive bool
+	ConsumeExclusive bool //do not effect on rpc and stream ,always true
 	ConsumeNoWait    bool
 	ConsumeArg       amqp.Table
 
