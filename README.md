@@ -1,4 +1,4 @@
-## based on [github.com/rabbitmq/amqp091-go](hppts://github.com/rabbitmq/amqp091-go)
+## based on [github.com/rabbitmq/amqp091-go](https://github.com/rabbitmq/amqp091-go)
 
 ## Urls and connect
 ```golang 
