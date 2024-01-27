@@ -164,7 +164,7 @@ func (r *RmqCh) __prepareForPublish(exchangeKind, exchange, queue string) (err e
 	return
 }
 
-func (r *RmqCh) Publish(ctx context.Context, path, correlationId, replyTo, body string) (err error) {
+func (r *RmqCh) Publish(ctx context.Context, path, correlationId, replyTo string, body []byte) (err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -190,7 +190,7 @@ func (r *RmqCh) Publish(ctx context.Context, path, correlationId, replyTo, body 
 			Type:            r.option.MessageType,
 			ReplyTo:         replyTo,
 			CorrelationId:   correlationId,
-			Body:            []byte(body),
+			Body:            body,
 		})
 	if err != nil {
 		amqp.Logger.Printf("rmq error publish:%s", err)
@@ -251,7 +251,7 @@ func (r *RmqCh) __prepareForPublishDlx(exchangeKind, exchange, queueDlx string) 
 	return
 }
 
-func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, body string, delay time.Duration) (err error) {
+func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo string, body []byte, delay time.Duration) (err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -280,7 +280,7 @@ func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, bo
 			Type:            r.option.MessageType,
 			ReplyTo:         replyTo,
 			CorrelationId:   correlationId,
-			Body:            []byte(body),
+			Body:            body,
 			Timestamp:       time.Now(),
 			Expiration:      expiration,
 		})

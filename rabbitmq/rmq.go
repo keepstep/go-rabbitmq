@@ -216,7 +216,7 @@ func (r *Rmq) Check() (err error) {
 	return
 }
 
-func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo, body string) (err error) {
+func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo string, body []byte) (err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -224,7 +224,7 @@ func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo, body st
 	return r.ch.Publish(ctx, path, correlationId, replyTo, body)
 }
 
-func (r *Rmq) PublishDlx(ctx context.Context, path, correlationId, replyTo, body string, delay time.Duration) (err error) {
+func (r *Rmq) PublishDlx(ctx context.Context, path, correlationId, replyTo string, body []byte, delay time.Duration) (err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -256,12 +256,12 @@ func (r *Rmq) Receive(ctx context.Context, msgs <-chan amqp.Delivery, callback f
 	return r.ch.Receive(ctx, msgs, callback)
 }
 
-func (r *Rmq) Rpc(ctx context.Context, queue, correlationId, replyTo, body string) (rst []byte, err error) {
+func (r *Rmq) Rpc(ctx context.Context, queue, correlationId, replyTo string, data []byte) (rst []byte, err error) {
 	err = r.Check()
 	if err != nil {
 		return
 	}
-	return r.ch.Rpc(ctx, queue, correlationId, replyTo, body)
+	return r.ch.Rpc(ctx, queue, correlationId, replyTo, data)
 }
 
 func (r *Rmq) Stream(ctx context.Context, active bool, queue, replyTo string, stepFunc func(received bool, data *RmqStreamData) (stop bool)) (err error) {

@@ -8,7 +8,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body string) (rst []byte, err error) {
+func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo string, data []byte) (rst []byte, err error) {
 	err = r.Check()
 	if err != nil {
 		return
@@ -66,7 +66,7 @@ func (r *RmqCh) Rpc(ctx context.Context, queue, correlationId, replyTo, body str
 			Type:            r.option.MessageType,
 			ReplyTo:         replyTo,
 			CorrelationId:   correlationId,
-			Body:            []byte(body),
+			Body:            data,
 		})
 	if err != nil {
 		amqp.Logger.Printf("rpc error publish:%s", err)

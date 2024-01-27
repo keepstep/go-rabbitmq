@@ -55,7 +55,7 @@ func test() {
 			case <-time.After(time.Second * timeDelay):
 				i++
 				id := fmt.Sprintf("%d", i)
-				err := r.Publish(ctx, path, id, replyTo, "123")
+				err := r.Publish(ctx, path, id, replyTo, []byte("123"))
 				if err != nil {
 					break
 				} else {
@@ -110,6 +110,7 @@ func testDlx() {
 	timeDelay := time.Millisecond * 100
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
 	r.QueueDelete(queue, false, false)
+	r.QueueDelete(queue+"_dlx", false, false)
 	r.QueueDelete(replyTo, false, false)
 	r.ExchangeDelete("ex_dlx_topic", false)
 	msgs, _, err := r.ConsumeDlx(path, queue, "")
@@ -128,7 +129,7 @@ func testDlx() {
 			case <-time.After(timeDelay):
 				i++
 				id := fmt.Sprintf("%d", i)
-				err := r.PublishDlx(ctx, path, id, replyTo, "dlx_msg", time.Second*2)
+				err := r.PublishDlx(ctx, path, id, replyTo, []byte("dlx_msg"), time.Second*2)
 				if err != nil {
 					break
 				} else {
@@ -189,6 +190,10 @@ func testDlxMultiChannel() {
 		Log("Channel err %s", err)
 		return
 	}
+	r.QueueDelete(queue, false, false)
+	r.QueueDelete(queue+"_dlx", false, false)
+	r.QueueDelete(replyTo, false, false)
+	r.ExchangeDelete("ex_dlx_topic", false)
 	msgs, _, err := rch.ConsumeDlx(path, queue, "")
 	if err != nil {
 		Log("Consume err %s", err)
@@ -205,7 +210,7 @@ func testDlxMultiChannel() {
 			case <-time.After(timeDelay):
 				i++
 				id := fmt.Sprintf("%d", i)
-				err := r.PublishDlx(ctx, path, id, replyTo, "dlx_msg", time.Second*2)
+				err := r.PublishDlx(ctx, path, id, replyTo, []byte("dlx_msg"), time.Second*2)
 				if err != nil {
 					break
 				} else {
@@ -266,7 +271,7 @@ func testReconnect() {
 				return
 			case <-time.After(timeDelay):
 				id := fmt.Sprintf("%d", i)
-				err := r.Publish(ctx, path, id, replyTo, "recon_msg")
+				err := r.Publish(ctx, path, id, replyTo, []byte("recon_msg"))
 				if err != nil {
 					Log("publish_reconnect err %d %s", i, err)
 					<-time.After(time.Second * 2)
@@ -341,7 +346,7 @@ func testRpc() {
 			default:
 				id := fmt.Sprintf("cid%03d", i)
 				// Log("rpc start %d", i)
-				bs, err := r.Rpc(ctx, queue, id, replyTo, "msg")
+				bs, err := r.Rpc(ctx, queue, id, replyTo, []byte("msg"))
 				if err != nil {
 					Log("rpc err %d %s", i, err)
 					<-time.After(time.Second * 2)
@@ -372,7 +377,7 @@ func testRpc() {
 			} else {
 				id := msg.CorrelationId
 				Log("   receive %s : %s %s\n", id, msg.ReplyTo, string(msg.Body))
-				err = rch.Publish(ctx, msg.ReplyTo, id, "", fmt.Sprintf("%s_%s", string(msg.Body), id))
+				err = rch.Publish(ctx, msg.ReplyTo, id, "", []byte(fmt.Sprintf("%s_%s", string(msg.Body), id)))
 				if err != nil {
 					Log("   receive return error %s", err)
 				} else {
