@@ -264,12 +264,12 @@ func (r *Rmq) Rpc(ctx context.Context, queue, correlationId, replyTo, body strin
 	return r.ch.Rpc(ctx, queue, correlationId, replyTo, body)
 }
 
-func (r *Rmq) Stream(ctx context.Context, queue, replyTo string, streamFunc func(isReq bool, data *RmqStreamData) (stop bool)) (err error) {
+func (r *Rmq) Stream(ctx context.Context, active bool, queue, replyTo string, stepFunc func(received bool, data *RmqStreamData) (stop bool)) (err error) {
 	err = r.Check()
 	if err != nil {
 		return
 	}
-	return r.ch.Stream(ctx, queue, replyTo, streamFunc)
+	return r.ch.Stream(ctx, active, queue, replyTo, stepFunc)
 }
 
 func (r *Rmq) QueuePurge(queue string) (count int, err error) {

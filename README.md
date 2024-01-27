@@ -1,4 +1,4 @@
-# mq based github.com/rabbitmq/amqp091-go
+## based on [github.com/rabbitmq/amqp091-go](hppts://github.com/rabbitmq/amqp091-go)
 
 ## Urls and connect
 ```golang 
@@ -9,17 +9,10 @@
 
 ## Param path with several forms: 
 ```
-1. consist of exchageType，exchangeName，key(for publish) or route(for consume) and seperated by '/', in order to simply call
+1. consist of exchageType，exchangeName，key(for publish) or route(for consume) and seperated by '/' for convenience 
 2. path is queue name if not use exchange
+3. eg:"direct/exchangeName/key"
 ```
-
-## Option
-```golang 
-1. each rmqch hold an exclusive Option
-2. rmqch will hold an Option inherited from rmq.option while call rmq.Channel(name,nil)
-3. you can call ApplyOption to change option of rmq
-```
-
 ```golang
 // path : "direct/exchangeName/key" or "topic/exchangeName/key" or "fanout/exchangeName" or "queueName"
 func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo, body string) (err error){}
@@ -35,6 +28,14 @@ func (r *Rmq) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery, d
 func (r *Rmq) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error){}
 ```
 
+## Option
+```golang 
+1. each rmqch hold an exclusive Option
+2. rmqch will hold an Option inherited from rmq.option while call rmq.Channel(name,nil)
+3. you can call ApplyOption to change option of rmq
+```
+
+
 ## Rmq and RmqCh
 ```golang
 1. rmq hold amqp.Connect
@@ -47,18 +48,23 @@ func (r *Rmq) GenConsumerDlx(path, queue, tag string) (msgs <-chan amqp.Delivery
 
 ## Rpc
 ```golang
-1. do not support exchange and consume with param exclusive: true
+1. do not support exchange , consume with param exclusive: true
 2. identify messages by correlationID and auto ignore the other messages until received the correct msg then return
 3. Option also effect on rpc, so it is better to use a new channel exclusively to call rpc
 ```
 
 ## Stream
 ```golang
-1. do not support exchange , consume with param exclusive: true
-2. identify messages by correlationID and auto ignore the other messages until received the correct msg then return
-3. param callback has two functions : fill request correlationId,body and receive response body for each rpc
-4. continuously rpc, until callback return true then return
+1. do not support exchange , consume with param exclusive=true while active==true
+2. identify messages by correlationID and auto ignore the other messages until received the correct msg then continue
+3. param stepFunc do 2 things : receive data and fill send data
+4. continuously rpc, until stepFunc return stop = true then return
 5. Option also effect on stream, so it is better to use a new channel exclusively to call stream
+6. msg flow one by one, each send must need one reply
+// if active == true  means: role is sender,   first to send msg (received==false) then receive 
+// if active == false means: role is receiver, first to receive msg then reply , param replyTo not effect and can be empty
+func (r *RmqCh) Stream(ctx context.Context, active bool, queue, replyTo string, stepFunc func(received bool, data *RmqStreamData) (stop bool)) (err error) {
+}
 ```
 
 ## DLX testing feature
@@ -71,15 +77,20 @@ func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, bo
     duration := time.Duration(q.Messages+1) * delay
     expiration := fmt.Sprintf("%d", int(duration.Milliseconds()))
     ...
-    err = r.ch.PublishWithContext(ctx, "", queueDlx, false, false, amqp.Publishing{
-		DeliveryMode:  amqp.Persistent,
-		ContentType:   "text/plain",
-		ReplyTo:       replyTo,
-		CorrelationId: correlationId,
-		Body:          []byte(body),
-		Timestamp:     time.Now(),
-		Expiration:    expiration,
-	})
+	err = r.ch.PublishWithContext(ctx, "", queueDlx,
+		r.option.Mandatory,
+		r.option.Immediate,
+		amqp.Publishing{
+			DeliveryMode:    r.option.DeliveryMode,
+			ContentType:     r.option.ContentType,
+			ContentEncoding: r.option.ContentEncoding,
+			Type:            r.option.MessageType,
+			ReplyTo:         replyTo,
+			CorrelationId:   correlationId,
+			Body:            []byte(body),
+			Timestamp:       time.Now(),
+			Expiration:      expiration,
+		})
     ...
 }
 ```

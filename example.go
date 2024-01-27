@@ -402,7 +402,7 @@ func testStream() {
 	r, err := rmq.NewRmq(urls, nil,
 		rmq.OptionAutoDelete(true),
 		rmq.OptionContentType("json"),
-		rmq.OptionRpcPurgeQueue(true, true),
+		rmq.OptionStreamPurgeQueue(true, true),
 	)
 	if err != nil {
 		Log("NewRmq err %s", err)
@@ -415,7 +415,7 @@ func testStream() {
 	}
 	queue := "stream_q"
 	replyTo := "stream_q_return"
-	count := 100
+	count := 35
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*60)
 	// r.QueueDelete(queue, false, false)
 	// r.QueueDelete(replyTo, false, false)
@@ -424,81 +424,70 @@ func testStream() {
 	q, eeee = r.QueueInspect(replyTo)
 	Log("stream inspect queue %s : %d %d %s", q.Name, q.Messages, q.Consumers, eeee)
 
+	Log("--------------------------")
+	Log("--------------------------")
+	Log("--------------------------")
+
 	go func() {
-		eee := r.Stream(ctx, queue, replyTo, func(isReq bool, data *rmq.RmqStreamData) (stop bool) {
-			if isReq {
-				if data.Index > count {
-					return true
-				} else {
-					data.CorrelationId = fmt.Sprintf("sid_%03d", data.Index)
-					data.ReqBody = []byte("stream_msg")
-					return false
-				}
+		eee := r.Stream(ctx, true, queue, replyTo, func(received bool, data *rmq.RmqStreamData) (stop bool) {
+			if received {
+				Log("stream active recv %s", string(data.RecvBody))
+				Log("--------------------------")
+				<-time.After(time.Second)
 			} else {
-				Log("stream rsp step %d %s", data.Index, string(data.RspBody))
-				if data.Index >= count {
-					return true
-				} else {
-					<-time.After(time.Second)
-					return false
-				}
+				Log("stream active first %d", data.Index)
+			}
+			if data.Index >= count {
+				return true
+			} else {
+				data.SendCorrelationId = fmt.Sprintf("sid_%03d", data.Index)
+				data.SendBody = []byte("active_msg_" + data.SendCorrelationId)
+				Log("stream active send %d %s", data.Index, string(data.SendBody))
+				return false
 			}
 		})
 		if eee != nil {
-			Log("stream err %s", eee)
+			Log("stream active err %s", eee)
 		}
 	}()
-	go func() {
-		<-time.After(time.Second * 5)
-		q, eeee := r.QueueInspect(queue)
-		if eeee == nil {
-			Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
-		}
-		q, eeee = r.QueueInspect(replyTo)
-		if eeee == nil {
-			Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
-		}
-	}()
-	for {
-		rch, err := r.Channel("pig")
+	// go func() {
+	// 	<-time.After(time.Second * 5)
+	// 	q, eeee := r.QueueInspect(queue)
+	// 	if eeee == nil {
+	// 		Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
+	// 	}
+	// 	q, eeee = r.QueueInspect(replyTo)
+	// 	if eeee == nil {
+	// 		Log("stream inspect queue %s : %d %d", q.Name, q.Messages, q.Consumers)
+	// 	}
+	// }()
+	passiveFunc := func(name string) {
+		rch, err := r.Channel(name)
 		if err != nil {
 			Log("stream Channel err %s", err)
-			<-time.After(time.Second * 2)
-			continue
 		}
-		msgs, _, err := rch.Consume(queue, queue, "")
-		if err != nil {
-			Log("stream Consume err %s", err)
-			<-time.After(time.Second * 2)
-			continue
-		}
-		err = rch.Receive(ctx, msgs, func(msg *amqp.Delivery, err error) (ackOrReject bool, stop bool) {
-			if err != nil {
-				Log("   receive error %s", err)
-			} else {
-				id := msg.CorrelationId
-				Log("   receive %s : %s %s\n", id, msg.ReplyTo, string(msg.Body))
-				err = rch.Publish(ctx, msg.ReplyTo, id, "", fmt.Sprintf("%s_%s", string(msg.Body), id))
-				if err != nil {
-					Log("   receive return error %s", err)
-				} else {
-					Log("   receive return succ %s", id)
-				}
+		eee := rch.Stream(ctx, false, "", queue, func(received bool, data *rmq.RmqStreamData) (stop bool) {
+			if received {
+				Log("stream passive recv %s", string(data.RecvBody))
+				// <-time.After(time.Second)
 			}
-			return true, false
+			if data.Index >= count {
+				return true
+			} else {
+				data.SendCorrelationId = data.RecvCorrelationId
+				data.SendBody = []byte(name + "_msg_" + data.RecvCorrelationId)
+				return false
+			}
 		})
-		if err != nil {
-			Log("receive err %s", err)
-			break
+		if eee != nil {
+			Log("stream passive err %s", eee)
 		}
-		if ctx.Err() != nil {
-			Log("receive over")
-			break
-		}
-		break
 	}
+	go passiveFunc("pig")
+	go passiveFunc("dog")
+	go passiveFunc("cat")
+	go passiveFunc("bob")
 
+	<-time.After(time.Second * 60)
 	Log("test stream over")
-
-	<-time.After(time.Second * 5)
 }
