@@ -1,4 +1,5 @@
-## based on [github.com/rabbitmq/amqp091-go](https://github.com/rabbitmq/amqp091-go)
+# go-rabbitmq
+## A simple wrapper of rabbitmq based on [rabbitmq/amqp091-go](https://github.com/rabbitmq/amqp091-go)
 
 ## Urls and connect
 ```golang 
@@ -15,11 +16,11 @@
 ```
 ```golang
 // path : "direct/exchangeName/key" or "topic/exchangeName/key" or "fanout/exchangeName" or "queueName"
-func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo, body string) (err error){}
+func (r *Rmq) Publish(ctx context.Context, path, correlationId, replyTo string, body []byte) (err error){}
 
 // path : "exchangType/exchangeName/queue" return exchangType,exchangeName,queue_dlx
 // 死信队列 自动创建 名为：queue 加后缀 _dlx
-func (r *Rmq) PublishDlx(ctx context.Context, path, correlationId, replyTo, body string, delay time.Duration) (err error) {}
+func (r *Rmq) PublishDlx(ctx context.Context, path, correlationId, replyTo string, body []byte, delay time.Duration) (err error) {}
 
 //path :"direct/exchangeName/route" or "topic/exchangeName/route" or "fanout/exchangeName" or "queueName"
 func (r *Rmq) GenConsumer(path, queue, tag string) (msgs <-chan amqp.Delivery, done chan error, err error){}
@@ -72,7 +73,7 @@ func (r *RmqCh) Stream(ctx context.Context, active bool, queue, replyTo string, 
 1. expiration of msg = (msgCount + 1) * delay
 2. try testDlx() to known more
 //----------------------
-func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo, body string, delay time.Duration) {
+func (r *RmqCh) PublishDlx(ctx context.Context, path, correlationId, replyTo string, body []byte, delay time.Duration) {
     ...
     duration := time.Duration(q.Messages+1) * delay
     expiration := fmt.Sprintf("%d", int(duration.Milliseconds()))
